@@ -5,7 +5,7 @@ status: 完成
 
 # Dijkstra（优先队列）
 
-> 复杂度：$O(m \log n)$。**非负边权**；负权用 SPFA / Bellman-Ford。
+> 复杂度： $O(m \log n)$。**非负边权**；负权用 SPFA / Bellman-Ford。
 
 ```cpp
 #include <bits/stdc++.h>
@@ -41,7 +41,7 @@ int main(){
 
 > [!tip] 相关板子
 > - SPFA（判负环、负权）：Bellman-Ford 队列优化
-> - Floyd（全源，$O(n^3)$）
+> - Floyd（全源， $O(n^3)$）
 > - 次短路 / k 短路（堆 + 分支删除）
 
 相关：[[图论]]、[[网络流]]
