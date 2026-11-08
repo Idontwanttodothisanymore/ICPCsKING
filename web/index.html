@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>ICPCsKING 笔记</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/docsify@4/themes/vue.css" />
+<style>
+  :root { --theme-color: #2f6fdd; }
+  body { --sidebar-width: 300px; }
+  .markdown-section { max-width: 900px; padding-bottom: 40vh; }
+  .markdown-section p, .markdown-section li { line-height: 1.8; }
+  .markdown-section pre > code { font-size: 13px; line-height: 1.55; }
+  mjx-container[display="true"] { overflow-x: auto; overflow-y: hidden; padding: 6px 0; }
+  .math-block { overflow-x: auto; }
+  .wiki-link { border-bottom: 1px dashed var(--theme-color); text-decoration: none; }
+  .wiki-embed, .wiki-missing { font-size: 90%; color: #8a8f98; }
+  .sidebar-nav .folder { font-weight: 600; }
+</style>
+<script>
+  window.MathJax = {
+    tex: {
+      inlineMath: [['$', '$']],
+      displayMath: [['$$', '$$']],
+      processEscapes: true
+    },
+    options: {
+      skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code', 'kbd']
+    },
+    chtml: { scale: 1.05 }
+  };
+</script>
+<script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"></script>
+</head>
+<body>
+<div id="app">正在加载笔记……</div>
+
+<script src="notes-map.js"></script>
+<script>
+(function () {
+  var MAP = window.NOTES_MAP || {};
+  var mathStore = [];
+
+  function esc(s) {
+    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  function notePath(target) {
+    var t = (target || '').trim();
+    if (!t) return null;
+    if (MAP[t]) return MAP[t];
+    var base = t.split('/').pop();
+    if (base && MAP[base]) return MAP[base];
+    return null;
+  }
+
+  function hashRoute(p) {
+    return '#/' + p.replace(/\.md$/, '');
+  }
+
+  // Obsidian 双链 [[目标]] / [[目标|别名]] 与嵌入 ![[目标]]
+  function replaceWiki(md) {
+    md = md.replace(/!\[\[([^\[\]|]+?)(?:\|([^\[\]]+?))?\]\]/g, function (m, target, alias) {
+      var label = (alias || target).trim();
+      var p = notePath(target);
+      if (p) {
+        return '<a class="wiki-embed" href="' + hashRoute(p) + '">嵌入笔记 · ' + esc(label) + '</a>';
+      }
+      return '<span class="wiki-missing">图片未上传 · ' + esc(label) + '</span>';
+    });
+    md = md.replace(/\[\[([^\[\]|]+?)(?:\|([^\[\]]+?))?\]\]/g, function (m, target, alias) {
+      var label = (alias || target).trim();
+      var p = notePath(target);
+      if (!p) return '<span class="wiki-missing">' + esc(label) + '</span>';
+      return '<a class="wiki-link" href="' + hashRoute(p) + '">' + esc(label) + '</a>';
+    });
+    return md;
+  }
+
+  // 把 $...$ / $$...$$ 先换成占位符，避免 marked 破坏 LaTeX
+  function protectMath(md) {
+    mathStore = [];
+
+    md = md.replace(/\$\$([\s\S]+?)\$\$/g, function (m, body) {
+      var i = mathStore.length;
+      mathStore.push('<div class="math-block">$$' + esc(body) + '$$</div>');
+      return '@@MATH' + i + '@@';
+    });
+
+    md = md.replace(/\$([^$\n]+?)\$/g, function (m, body) {
+      if (/^\s/.test(body) || /\s$/.test(body)) return m;
+      var i = mathStore.length;
+      mathStore.push('<span class="math-inline">$' + esc(body) + '$</span>');
+      return '@@MATH' + i + '@@';
+    });
+
+    return md;
+  }
+
+  function restoreMath(html) {
+    return html.replace(/@@MATH(\d+)@@/g, function (m, i) {
+      return mathStore[+i] !== undefined ? mathStore[+i] : '';
+    });
+  }
+
+  function beforeEach(md) {
+    if (!md) return md;
+    var codeStore = [];
+
+    // 保护代码块与行内代码，避免其中的 $ 与 [[...]] 被处理
+    md = md.replace(/(^|\n)((?:```|~~~)[\s\S]*?(?:```|~~~))/g, function (m, lead, block) {
+      codeStore.push(block);
+      return lead + '@@CODE' + (codeStore.length - 1) + '@@';
+    });
+    md = md.replace(/`[^`\n]*`/g, function (m) {
+      codeStore.push(m);
+      return '@@CODE' + (codeStore.length - 1) + '@@';
+    });
+
+    md = replaceWiki(md);
+    md = protectMath(md);
+
+    md = md.replace(/@@CODE(\d+)@@/g, function (m, i) {
+      return codeStore[+i] !== undefined ? codeStore[+i] : m;
+    });
+
+    return md;
+  }
+
+  function typeset() {
+    if (!window.MathJax || !MathJax.typesetPromise) return;
+    var section = document.querySelector('.markdown-section');
+    var target = section ? [section] : null;
+    MathJax.typesetPromise(target).catch(function (e) {
+      console.warn('[MathJax]', e && e.message);
+    });
+  }
+
+  window.$docsify = {
+    name: 'ICPCsKING',
+    repo: 'https://github.com/Idontwanttodothisanymore/ICPCsKING',
+    homepage: 'home.md',
+    loadSidebar: true,
+    subMaxLevel: 3,
+    maxLevel: 3,
+    auto2top: true,
+    executeScript: false,
+    search: {
+      depth: 3,
+      placeholder: '搜索笔记',
+      noData: '没有找到结果'
+    },
+    plugins: [
+      function (hook) {
+        hook.beforeEach(beforeEach);
+        hook.afterEach(function (html) {
+          return restoreMath(html);
+        });
+        hook.doneEach(typeset);
+      }
+    ]
+  };
+})();
+</script>
+<script src="https://cdn.jsdelivr.net/npm/docsify@4/lib/docsify.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/docsify@4/lib/plugins/search.min.js"></script>
+</body>
+</html>
